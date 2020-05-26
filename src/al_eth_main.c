@@ -655,6 +655,8 @@ static int al_eth_board_params_init(struct al_eth_adapter *adapter)
 			dev_warn(&adapter->pdev->dev,
 				"%s: invalid speed (%d)\n", __func__,
 				params.speed);
+			adapter->link_config.active_speed = 1000;
+			break;
 		case AL_ETH_BOARD_1G_SPEED_1000M:
 			adapter->link_config.active_speed = 1000;
 			break;
@@ -671,6 +673,8 @@ static int al_eth_board_params_init(struct al_eth_adapter *adapter)
 			dev_warn(&adapter->pdev->dev,
 			"%s: invalid mdio freq (%d)\n", __func__,
 			params.mdio_freq);
+			adapter->mdio_freq = 2500;
+			break;
 		case AL_ETH_BOARD_MDIO_FREQ_2_5_MHZ:
 			adapter->mdio_freq = 2500;
 			break;
