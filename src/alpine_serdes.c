@@ -35,7 +35,7 @@ static uint32_t serdes_grp_offset[] = {0, 0x400, 0x800, 0xc00, 0x2000};
 
 static struct al_serdes_grp_obj serdes_grp_obj[AL_SRDS_NUM_GROUPS];
 
-static int __init al_serdes_resource_init(void)
+static int al_serdes_resource_init(void)
 {
 	struct device_node *np;
 
@@ -51,12 +51,11 @@ static int __init al_serdes_resource_init(void)
 	}
 	return 0;
 }
-arch_initcall(al_serdes_resource_init);
 
 static int alpine_serdes_thermal_get(void)
 {
 	struct thermal_zone_device *thermal;
-	unsigned long temp;
+	int temp;
 
 	thermal = thermal_zone_get_zone_by_name("cpu-thermal");
 
@@ -92,7 +91,6 @@ void __iomem *alpine_serdes_resource_get(u32 group)
 
 	return base;
 }
-EXPORT_SYMBOL(alpine_serdes_resource_get);
 
 static struct alpine_serdes_eth_group_mode {
 	struct mutex			lock;
@@ -153,7 +151,6 @@ int alpine_serdes_eth_mode_set(
 
 	return 0;
 }
-EXPORT_SYMBOL(alpine_serdes_eth_mode_set);
 
 void alpine_serdes_eth_group_lock(u32 group)
 {
@@ -162,7 +159,6 @@ void alpine_serdes_eth_group_lock(u32 group)
 
 	mutex_lock(&group_mode->lock);
 }
-EXPORT_SYMBOL(alpine_serdes_eth_group_lock);
 
 int alpine_serdes_eth_group_trylock(u32 group)
 {
@@ -171,7 +167,6 @@ int alpine_serdes_eth_group_trylock(u32 group)
 
 	return mutex_trylock(&group_mode->lock);
 }
-EXPORT_SYMBOL(alpine_serdes_eth_group_trylock);
 
 void alpine_serdes_eth_group_unlock(u32 group)
 {
@@ -180,7 +175,6 @@ void alpine_serdes_eth_group_unlock(u32 group)
 
 	mutex_unlock(&group_mode->lock);
 }
-EXPORT_SYMBOL(alpine_serdes_eth_group_unlock);
 
 struct al_serdes_grp_obj *alpine_serdes_grp_obj_get(u32 group)
 {
@@ -189,11 +183,12 @@ struct al_serdes_grp_obj *alpine_serdes_grp_obj_get(u32 group)
 
 	return &serdes_grp_obj[group];
 }
-EXPORT_SYMBOL(alpine_serdes_grp_obj_get);
 
-static int __init alpine_serdes_grp_objs_init(void)
+int alpine_serdes_grp_objs_init(void)
 {
 	u32 group;
+
+	al_serdes_resource_init();
 
 	for (group = 0; group < AL_SRDS_NUM_GROUPS; group++) {
 		al_serdes_handle_grp_init(
@@ -205,4 +200,3 @@ static int __init alpine_serdes_grp_objs_init(void)
 
 	return 0;
 }
-subsys_initcall(alpine_serdes_grp_objs_init);

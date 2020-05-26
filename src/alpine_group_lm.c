@@ -35,7 +35,7 @@ static unsigned int alpine_systime_msec_get(void)
 	return (unsigned int)((ts.tv_sec * 1000) + (ts.tv_nsec / 1000000));
 }
 
-static int __init alpine_group_lm_init(void)
+int alpine_group_lm_init(void)
 {
 	enum al_serdes_group serdes_grp;
 	enum al_serdes_lane serdes_lane;
@@ -63,8 +63,6 @@ static int __init alpine_group_lm_init(void)
 
 	return 0;
 }
-/* using fs_initcall so this function is invoked after alpine_serdes_grp_objs_init() */
-fs_initcall(alpine_group_lm_init);
 
 struct al_eth_group_lm_context *alpine_group_lm_get(u32 group)
 {
@@ -73,4 +71,3 @@ struct al_eth_group_lm_context *alpine_group_lm_get(u32 group)
 
 	return &group_lm_context[group];
 }
-EXPORT_SYMBOL(alpine_group_lm_get);
