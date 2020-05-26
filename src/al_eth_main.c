@@ -187,10 +187,6 @@ static const struct pci_device_id al_eth_pci_tbl[] = {
 
 MODULE_DEVICE_TABLE(pci, al_eth_pci_tbl);
 
-#ifdef CONFIG_AL_ETH_ALLOC_SKB
-static DEFINE_PER_CPU(struct sk_buff_head, rx_recycle_cache);
-#endif
-
 /* the following defines should be moved to hal */
 #define AL_ETH_CTRL_TABLE_PRIO_SEL_SHIFT	0
 #define AL_ETH_CTRL_TABLE_PRIO_SEL_MASK		(0xF << AL_ETH_CTRL_TABLE_PRIO_SEL_SHIFT)
@@ -1765,106 +1761,6 @@ al_eth_vlan_rx_linear(struct al_eth_adapter *adapter, struct sk_buff *skb, u8 **
 	}
 }
 
-#ifdef CONFIG_AL_ETH_ALLOC_PAGE
-static	struct sk_buff *al_eth_rx_skb(struct al_eth_adapter *adapter,
-				      struct al_eth_ring *rx_ring,
-				      struct al_eth_pkt *hal_pkt,
-				      unsigned int descs,
-				      u16 *next_to_clean)
-{
-	struct sk_buff *skb;
-	struct al_eth_rx_buffer *rx_info =
-		&rx_ring->rx_buffer_info[*next_to_clean];
-	struct page *page = rx_info->page;
-	unsigned int len, orig_len;
-	unsigned int buf = 0;
-	u8 *va;
-
-	len = hal_pkt->bufs[0].len;
-	dev_dbg(&adapter->pdev->dev, "rx_info %p page %p\n",
-		rx_info, rx_info->page);
-
-	page = rx_info->page;
-	/* save virt address of first buffer */
-	va = page_address(rx_info->page) + rx_info->page_offset;
-	prefetch(va + AL_ETH_RX_OFFSET);
-
-	if (len <= adapter->small_copy_len) {
-		/** Smaller that this len will be copied to the skb header & dont use NAPI skb */
-		skb = netdev_alloc_skb_ip_align(adapter->netdev, adapter->small_copy_len);
-		if (unlikely(!skb)) {
-			/*rx_ring->rx_stats.alloc_rx_buff_failed++;*/
-			u64_stats_update_begin(&rx_ring->syncp);
-			rx_ring->rx_stats.skb_alloc_fail++;
-			u64_stats_update_end(&rx_ring->syncp);
-			netdev_dbg(adapter->netdev, "Failed allocating skb\n");
-			return NULL;
-		}
-
-		netdev_dbg(adapter->netdev, "rx skb allocated. len %d. data_len %d\n",
-						skb->len, skb->data_len);
-
-		netdev_dbg(adapter->netdev, "rx small packet. len %d\n", len);
-		/* Need to use the same length when using the dma_* APIs */
-		orig_len = len;
-		/* sync this buffer for CPU use */
-		dma_sync_single_for_cpu(rx_ring->dev, rx_info->dma, orig_len,
-					DMA_FROM_DEVICE);
-		if (hal_pkt->source_vlan_count > 0)
-			/* This function alters len when the packet has a vlan tag */
-			al_eth_vlan_rx_linear(adapter, skb, &va, &len);
-
-		skb_copy_to_linear_data(skb, va, len);
-
-		dma_sync_single_for_device(rx_ring->dev, rx_info->dma, orig_len,
-					DMA_FROM_DEVICE);
-
-		skb_put(skb, len);
-		skb->protocol = eth_type_trans(skb, adapter->netdev);
-		*next_to_clean = AL_ETH_RX_RING_IDX_ADD(rx_ring, *next_to_clean, descs);
-		/** Increase counters (relevent for adaptive interrupt modertaion only) */
-		rx_ring->bytes += orig_len;
-		return skb;
-	}
-	/**
-	 * Use napi_get_frags, it will call __napi_alloc_skb that will allocate the head from
-	 * a special region used only for NAPI Rx allocation.
-	 */
-	skb = napi_get_frags(rx_ring->napi);
-	if (unlikely(!skb)) {
-		u64_stats_update_begin(&rx_ring->syncp);
-		rx_ring->rx_stats.skb_alloc_fail++;
-		u64_stats_update_end(&rx_ring->syncp);
-		netdev_dbg(adapter->netdev, "Failed allocating skb\n");
-		return NULL;
-	}
-
-	do {
-		dma_unmap_page(rx_ring->dev, dma_unmap_addr(rx_info, dma),
-				PAGE_SIZE, DMA_FROM_DEVICE);
-
-		skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, rx_info->page,
-				rx_info->page_offset, len, PAGE_SIZE);
-
-		netdev_dbg(adapter->netdev, "rx skb updated. len %d. data_len %d\n",
-					skb->len, skb->data_len);
-
-		rx_info->page = NULL;
-		*next_to_clean = AL_ETH_RX_RING_IDX_NEXT(rx_ring, *next_to_clean);
-		if (likely(--descs == 0))
-			break;
-		rx_info = &rx_ring->rx_buffer_info[*next_to_clean];
-		len += hal_pkt->bufs[++buf].len;
-	} while (1);
-
-	al_eth_vlan_rx_frag(adapter, skb, va, &len);
-
-	/** Increase counters (relevent for adaptive interrupt modertaion only) */
-	rx_ring->bytes += len;
-
-	return skb;
-}
-#elif defined(CONFIG_AL_ETH_ALLOC_FRAG)
 static	struct sk_buff *al_eth_rx_skb(struct al_eth_adapter *adapter,
 				      struct al_eth_ring *rx_ring,
 				      struct al_eth_pkt *hal_pkt,
@@ -1977,42 +1873,6 @@ static	struct sk_buff *al_eth_rx_skb(struct al_eth_adapter *adapter,
 
 	return skb;
 }
-#elif defined(CONFIG_AL_ETH_ALLOC_SKB)
-static	struct sk_buff *al_eth_rx_skb(struct al_eth_adapter *adapter,
-				      struct al_eth_ring *rx_ring,
-				      struct al_eth_pkt *hal_pkt,
-				      unsigned int descs,
-				      u16 *next_to_clean)
-{
-	struct sk_buff *skb;
-	struct al_eth_rx_buffer *rx_info =
-		&rx_ring->rx_buffer_info[*next_to_clean];
-	unsigned int len;
-
-	prefetch(rx_info->data + AL_ETH_RX_OFFSET);
-	skb = rx_info->skb;
-	prefetch(skb);
-	prefetch(&skb->end);
-	prefetch(&skb->dev);
-
-	len = hal_pkt->bufs[0].len;
-
-	dma_unmap_single(rx_ring->dev, dma_unmap_addr(rx_info, dma),
-			rx_info->data_size, DMA_FROM_DEVICE);
-
-	skb_reserve(skb, AL_ETH_RX_OFFSET);
-	skb_put(skb, len);
-
-	skb->protocol = eth_type_trans(skb, adapter->netdev);
-	rx_info->skb = NULL;
-	*next_to_clean = AL_ETH_RX_RING_IDX_NEXT(rx_ring, *next_to_clean);
-	/* prefetch next packet */
-	prefetch((rx_info + 1)->data + AL_ETH_RX_OFFSET);
-	prefetch((rx_info + 1)->skb);
-
-	return skb;
-}
-#endif
 
 /* configure the RX forwarding (UDMA/QUEUE.. selection)
  * currently we don't use the full control table, we use only the default configuration
@@ -2914,65 +2774,6 @@ static void al_eth_free_all_rx_resources(struct al_eth_adapter *adapter)
 			al_eth_free_rx_resources(adapter, i);
 }
 
-#ifdef CONFIG_AL_ETH_ALLOC_PAGE
-static inline int
-al_eth_alloc_rx_page(struct al_eth_adapter *adapter,
-		     struct al_eth_rx_buffer *rx_info, gfp_t gfp)
-{
-	struct al_buf *al_buf;
-	struct page *page;
-	dma_addr_t dma;
-	struct al_eth_ring *rx_ring = container_of(&rx_info, struct al_eth_ring, rx_buffer_info);
-
-	/* if previous allocated page is not used */
-	if (rx_info->page != NULL)
-		return 0;
-
-	page = alloc_page(gfp);
-	if (unlikely(!page))
-		return -ENOMEM;
-
-	dma = dma_map_page(&adapter->pdev->dev, page, 0, PAGE_SIZE,
-				DMA_FROM_DEVICE);
-	if (unlikely(dma_mapping_error(&adapter->pdev->dev, dma))) {
-		u64_stats_update_begin(&rx_ring->syncp);
-		rx_ring->rx_stats.dma_mapping_err++;
-		u64_stats_update_end(&rx_ring->syncp);
-
-		__free_page(page);
-		return -EIO;
-	}
-	dev_dbg(&adapter->pdev->dev, "alloc page %p, rx_info %p\n",
-		page, rx_info);
-
-	rx_info->page = page;
-	rx_info->page_offset = 0;
-	al_buf = &rx_info->al_buf;
-	dma_unmap_addr_set(al_buf, addr, dma);
-	dma_unmap_addr_set(rx_info, dma, dma);
-	dma_unmap_len_set(al_buf, len, PAGE_SIZE);
-	return 0;
-}
-
-static void
-al_eth_free_rx_page(struct al_eth_adapter *adapter,
-		    struct al_eth_rx_buffer *rx_info)
-{
-	struct page *page = rx_info->page;
-	struct al_buf *al_buf = &rx_info->al_buf;
-
-	if (!page)
-		return;
-
-	dma_unmap_page(&adapter->pdev->dev, dma_unmap_addr(al_buf, addr),
-		       PAGE_SIZE, DMA_FROM_DEVICE);
-
-	__free_page(page);
-	rx_info->page = NULL;
-}
-
-#elif defined(CONFIG_AL_ETH_ALLOC_FRAG)
-
 static inline int
 al_eth_alloc_rx_frag(struct al_eth_adapter *adapter,
 		     struct al_eth_ring *rx_ring,
@@ -3044,145 +2845,6 @@ al_eth_free_rx_frag(struct al_eth_adapter *adapter,
 	rx_info->data = NULL;
 }
 
-#elif defined(CONFIG_AL_ETH_ALLOC_SKB)
-
-static inline int
-al_eth_alloc_rx_skb(struct al_eth_adapter *adapter,
-		     struct al_eth_ring *rx_ring,
-		     struct al_eth_rx_buffer *rx_info)
-{
-	struct sk_buff *skb;
-	struct al_buf *al_buf;
-	dma_addr_t dma;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
-	struct sk_buff_head *rx_rc = this_cpu_ptr(&rx_recycle_cache);
-#else
-	struct sk_buff_head *rx_rc = &__get_cpu_var(rx_recycle_cache);
-#endif
-
-	if (rx_info->skb)
-		return 0;
-
-	rx_info->data_size = rx_ring->netdev->mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
-
-	rx_info->data_size = max_t(unsigned int,
-				   rx_info->data_size,
-				   AL_ETH_DEFAULT_MIN_RX_BUFF_ALLOC_SIZE);
-
-	skb = __skb_dequeue(rx_rc);
-	if (skb == NULL)
-		skb = __netdev_alloc_skb_ip_align(rx_ring->netdev, rx_info->data_size, GFP_DMA);
-
-	if (!skb) {
-		u64_stats_update_begin(&rx_ring->syncp);
-		rx_ring->rx_stats.skb_alloc_fail++;
-		u64_stats_update_end(&rx_ring->syncp);
-		return -ENOMEM;
-	}
-
-	dma = dma_map_single(rx_ring->dev, skb->data + AL_ETH_RX_OFFSET,
-			rx_info->data_size, DMA_FROM_DEVICE);
-	if (unlikely(dma_mapping_error(rx_ring->dev, dma))) {
-		u64_stats_update_begin(&rx_ring->syncp);
-		rx_ring->rx_stats.dma_mapping_err++;
-		u64_stats_update_end(&rx_ring->syncp);
-
-		return -EIO;
-	}
-
-	rx_info->data = skb->data;
-	rx_info->skb = skb;
-
-	BUG_ON(!virt_addr_valid(rx_info->data));
-	al_buf = &rx_info->al_buf;
-	dma_unmap_addr_set(al_buf, addr, dma);
-	dma_unmap_addr_set(rx_info, dma, dma);
-	dma_unmap_len_set(al_buf, len, rx_info->data_size);
-	return 0;
-}
-
-static void
-al_eth_free_rx_skb(struct al_eth_adapter *adapter,
-		    struct al_eth_rx_buffer *rx_info)
-{
-	struct al_buf *al_buf = &rx_info->al_buf;
-
-	if (!rx_info->skb)
-		return;
-
-	dma_unmap_single(&adapter->pdev->dev, dma_unmap_addr(al_buf, addr),
-		       rx_info->data_size, DMA_FROM_DEVICE);
-	dev_kfree_skb_any(rx_info->skb);
-	rx_info->skb = NULL;
-}
-
-/* the following 3 functions taken from old kernels */
-static bool skb_is_recycleable(const struct sk_buff *skb, int skb_size)
-{
-	if (irqs_disabled())
-		return false;
-
-	if (skb_shinfo(skb)->tx_flags & SKBTX_DEV_ZEROCOPY)
-		return false;
-
-	if (skb_is_nonlinear(skb) || skb->fclone != SKB_FCLONE_UNAVAILABLE)
-		return false;
-
-	skb_size = SKB_DATA_ALIGN(skb_size + NET_SKB_PAD);
-	if (skb_end_offset(skb) < skb_size)
-		return false;
-
-	if (skb_shared(skb) || skb_cloned(skb))
-		return false;
-
-	return true;
-}
-
-/**
- *     skb_recycle - clean up an skb for reuse
- *     @skb: buffer
- *
- *     Recycles the skb to be reused as a receive buffer. This
- *     function does any necessary reference count dropping, and
- *     cleans up the skbuff as if it just came from __alloc_skb().
- */
-void skb_recycle(struct sk_buff *skb)
-{
-	struct skb_shared_info *shinfo;
-
-	skb_release_head_state(skb);
-	shinfo = skb_shinfo(skb);
-	memset(shinfo, 0, offsetof(struct skb_shared_info, dataref));
-	atomic_set(&shinfo->dataref, 1);
-
-	memset(skb, 0, offsetof(struct sk_buff, tail));
-	skb->data = skb->head + NET_SKB_PAD;
-	skb_reset_tail_pointer(skb);
-}
-
-/**
- *     skb_recycle_check - check if skb can be reused for receive
- *     @skb: buffer
- *     @skb_size: minimum receive buffer size
- *
- *     Checks that the skb passed in is not shared or cloned, and
- *     that it is linear and its head portion at least as large as
- *     skb_size so that it can be recycled as a receive buffer.
- *     If these conditions are met, this function does any necessary
- *     reference count dropping and cleans up the skbuff as if it
- *     just came from __alloc_skb().
-*/
-bool skb_recycle_check(struct sk_buff *skb, int skb_size)
-{
-	if (!skb_is_recycleable(skb, skb_size))
-		return false;
-
-	skb_recycle(skb);
-
-	return true;
-}
-#endif	/* CONFIG_AL_ETH_ALLOC_SKB */
-
 static int
 al_eth_refill_rx_bufs(struct al_eth_adapter *adapter, unsigned int qid,
 		      unsigned int num)
@@ -3197,14 +2859,7 @@ al_eth_refill_rx_bufs(struct al_eth_adapter *adapter, unsigned int qid,
 		int rc;
 		struct al_eth_rx_buffer *rx_info = &rx_ring->rx_buffer_info[next_to_use];
 
-#ifdef CONFIG_AL_ETH_ALLOC_PAGE
-		if (unlikely(al_eth_alloc_rx_page(adapter, rx_info,
-						  __GFP_COLD | GFP_ATOMIC | __GFP_COMP) < 0)) {
-#elif defined(CONFIG_AL_ETH_ALLOC_FRAG)
 		if (unlikely(al_eth_alloc_rx_frag(adapter, rx_ring, rx_info) < 0)) {
-#elif defined(CONFIG_AL_ETH_ALLOC_SKB)
-		if (unlikely(al_eth_alloc_rx_skb(adapter, rx_ring, rx_info) < 0)) {
-#endif
 			netdev_warn(adapter->netdev, "failed to alloc buffer for rx queue %d\n",
 				    qid);
 			break;
@@ -3243,16 +2898,8 @@ al_eth_free_rx_bufs(struct al_eth_adapter *adapter, unsigned int qid)
 	for (i = 0; i < AL_ETH_DEFAULT_RX_DESCS; i++) {
 		struct al_eth_rx_buffer *rx_info = &rx_ring->rx_buffer_info[i];
 
-#ifdef CONFIG_AL_ETH_ALLOC_PAGE
-		if (rx_info->page)
-			al_eth_free_rx_page(adapter, rx_info);
-#elif defined(CONFIG_AL_ETH_ALLOC_FRAG)
 		if (rx_info->data)
 			al_eth_free_rx_frag(adapter, rx_info);
-#elif defined(CONFIG_AL_ETH_ALLOC_SKB)
-		if (rx_info->skb)
-			al_eth_free_rx_skb(adapter, rx_info);
-#endif
 	}
 }
 
@@ -3429,13 +3076,6 @@ al_eth_tx_poll(struct napi_struct *napi, int budget)
 	unsigned int total_done;
 	u16 next_to_clean;
 	int tx_pkt = 0;
-#ifdef CONFIG_AL_ETH_ALLOC_SKB
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
-	struct sk_buff_head *rx_rc = this_cpu_ptr(&rx_recycle_cache);
-#else
-	struct sk_buff_head *rx_rc = &__get_cpu_var(rx_recycle_cache);
-#endif
-#endif
 	total_done = al_eth_comp_tx_get(tx_ring->dma_q);
 	dev_dbg(&adapter->pdev->dev, "tx_poll: q %d total completed descs %x\n",
 		qid, total_done);
@@ -3474,13 +3114,6 @@ al_eth_tx_poll(struct napi_struct *napi, int budget)
 		tx_bytes += skb->len;
 		dev_dbg(&adapter->pdev->dev, "tx_poll: q %d skb %p completed\n",
 				qid, skb);
-#ifdef CONFIG_AL_ETH_ALLOC_SKB
-               if ((skb_queue_len(rx_rc) <
-                       AL_ETH_DEFAULT_RX_DESCS) &&
-                       skb_recycle_check(skb, tx_ring->netdev->mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN))
-                       __skb_queue_head(rx_rc, skb);
-               else
-#endif
 		       dev_kfree_skb(skb);
 		tx_pkt++;
 
@@ -3658,15 +3291,11 @@ al_eth_rx_poll(struct napi_struct *napi, int budget)
 		skb_record_rx_queue(skb, qid);
 
 		total_len += skb->len;
-#ifdef CONFIG_AL_ETH_ALLOC_SKB
-		netif_receive_skb(skb);
-#else
 		if (hal_pkt->bufs[0].len <= adapter->small_copy_len) {
 			small_copy_len_pkt++;
 			napi_gro_receive(napi, skb);
 		} else
 			napi_gro_frags(napi);
-#endif
 
 next:
 		budget--;
@@ -6037,12 +5666,10 @@ al_eth_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	netdev->vlan_features |= netdev->features;
 
 /* set this after vlan_features since it cannot be part of vlan_features */
-#if defined(CONFIG_AL_ETH_ALLOC_PAGE) || defined(CONFIG_AL_ETH_ALLOC_FRAG)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0))
 	netdev->features |= NETIF_F_HW_VLAN_CTAG_RX;
 #else
 	netdev->features |=  NETIF_F_HW_VLAN_RX;
-#endif
 #endif
 
 #if defined(NETIF_F_MQ_TX_LOCK_OPT)
@@ -6238,29 +5865,11 @@ static struct pci_driver al_eth_pci_driver = {
 
 static int __init al_eth_init(void)
 {
-#ifdef CONFIG_AL_ETH_ALLOC_SKB
-	struct sk_buff_head *rx_rc;
-	int cpu;
-
-	for_each_possible_cpu(cpu) {
-		rx_rc =  &per_cpu(rx_recycle_cache, cpu);
-		skb_queue_head_init(rx_rc);
-	}
-#endif
 	return pci_register_driver(&al_eth_pci_driver);
 }
 
 static void __exit al_eth_cleanup(void)
 {
-#ifdef CONFIG_AL_ETH_ALLOC_SKB
-	struct sk_buff_head *rx_rc;
-	int cpu;
-
-	for_each_possible_cpu(cpu) {
-		rx_rc =  &per_cpu(rx_recycle_cache, cpu);
-		skb_queue_purge(rx_rc);
-	}
-#endif
 	pci_unregister_driver(&al_eth_pci_driver);
 }
 

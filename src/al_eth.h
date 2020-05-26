@@ -162,11 +162,9 @@ struct al_eth_rx_buffer {
 	struct sk_buff *skb;
 	struct page *page;
 	unsigned int page_offset;
-#if (defined(CONFIG_AL_ETH_ALLOC_FRAG) || defined(CONFIG_AL_ETH_ALLOC_SKB))
 	u8 *data;
 	unsigned int data_size;
 	unsigned int frag_size; /* used in rx skb allocation */
-#endif
 	DEFINE_DMA_UNMAP_ADDR(dma);
 	struct al_buf	al_buf;
 };

@@ -1673,16 +1673,6 @@ extern void _kc_skb_add_rx_frag(struct sk_buff *, int, struct page *,
 #endif /* >= 3.4.0 */
 
 /*****************************************************************************/
-#if ( LINUX_VERSION_CODE >= KERNEL_VERSION(3,5,0) )
-#define HAVE_FDB_OPS
-#define HAVE_ETHTOOL_GET_TS_INFO
-#undef CONFIG_AL_ETH_ALLOC_PAGE
-#ifndef CONFIG_AL_ETH_ALLOC_FRAG
-#define CONFIG_AL_ETH_ALLOC_FRAG
-#endif
-#endif /* >= 3.5.0 */
-
-/*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(3,6,0) )
 #ifndef eth_random_addr
 #define eth_random_addr _kc_eth_random_addr
