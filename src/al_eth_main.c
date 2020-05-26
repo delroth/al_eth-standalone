@@ -4159,7 +4159,6 @@ al_eth_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 
 	return 0;
 }
-#endif
 
 static int
 al_eth_set_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
@@ -5463,7 +5462,9 @@ al_eth_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	netdev->netdev_ops = &al_eth_netdev_ops;
 
 	netdev->watchdog_timeo = TX_TIMEOUT;
+#if 0
 	netdev->ethtool_ops = &al_eth_ethtool_ops;
+#endif
 
 	if (!is_valid_ether_addr(adapter->mac_addr)) {
 		eth_hw_addr_random(netdev);
