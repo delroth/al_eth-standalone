@@ -4342,31 +4342,15 @@ static void al_eth_set_msglevel(struct net_device *netdev, u32 value)
 	adapter->msg_enable = value;
 }
 
-
-#ifdef HAVE_NDO_GET_STATS64
-static struct rtnl_link_stats64 *al_eth_get_stats64(struct net_device *netdev,
-						    struct rtnl_link_stats64 *stats)
-#else
-static struct net_device_stats *al_eth_get_stats(struct net_device *netdev)
 #endif
+
+static void al_eth_get_stats64(struct net_device *netdev,
+			       struct rtnl_link_stats64 *stats)
 {
 	struct al_eth_adapter *adapter = netdev_priv(netdev);
 	struct al_eth_mac_stats *mac_stats = &adapter->mac_stats;
-#ifdef HAVE_NDO_GET_STATS64
 	if (!adapter->up)
-		return NULL;
-#else
-	struct net_device_stats *stats;
-#ifdef HAVE_NETDEV_STATS_IN_NETDEV
-	stats = &netdev->net_stats;
-#else
-	stats = &adapter->net_stats;
-#endif /* HAVE_NETDEV_STATS_IN_NETDEV */
-	if (!adapter->up) {
-		memset(stats, 0, sizeof(*stats));
-		return stats;
-	}
-#endif /* HAVE_NDO_GET_STATS64 */
+		return;
 
 	al_eth_mac_stats_get(&adapter->hal_adapter, mac_stats);
 
@@ -4390,8 +4374,6 @@ static struct net_device_stats *al_eth_get_stats(struct net_device *netdev)
 
 	stats->rx_errors = mac_stats->ifInErrors;
 	stats->tx_errors = mac_stats->ifOutErrors;
-
-	return stats;
 }
 
 static void
@@ -5322,11 +5304,7 @@ static const struct net_device_ops al_eth_netdev_ops = {
 #ifndef CONFIG_MACH_QNAPTS
 	.ndo_select_queue	= al_eth_select_queue,
 #endif
-#ifdef HAVE_NDO_GET_STATS64
 	.ndo_get_stats64	= al_eth_get_stats64,
-#else
-	.ndo_get_stats		= al_eth_get_stats,
-#endif
 	.ndo_do_ioctl		= al_eth_ioctl,
 	.ndo_tx_timeout		= al_eth_tx_timeout,
 	.ndo_change_mtu		= al_eth_change_mtu,
