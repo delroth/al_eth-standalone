@@ -5169,16 +5169,9 @@ dma_error:
 	return NETDEV_TX_OK;
 }
 
-#if (defined HAVE_NETDEV_SELECT_QUEUE) || (defined HAVE_NET_DEVICE_OPS)
 /* Return subqueue id on this core (one per core). */
-static u16 al_eth_select_queue(struct net_device *dev, struct sk_buff *skb
-#if (defined HAVE_NDO_SELECT_QUEUE_ACCEL) || (defined HAVE_NDO_SELECT_QUEUE_ACCEL_FALLBACK)
-	, void *accel_priv
-#endif
-#if (defined HAVE_NDO_SELECT_QUEUE_ACCEL_FALLBACK)
-	, select_queue_fallback_t fallback
-#endif
-	)
+static u16 al_eth_select_queue(struct net_device *dev, struct sk_buff *skb,
+			       struct net_device *sb_dev)
 {
 	u16 qid;
 	/* we suspect that this is good for in--kernel network services that want to loop incoming skb rx to tx
@@ -5193,19 +5186,12 @@ static u16 al_eth_select_queue(struct net_device *dev, struct sk_buff *skb
 		qid = smp_processor_id();
 #else
 		/** Is a host/NIC mode driver */
-#if (defined HAVE_NDO_SELECT_QUEUE_ACCEL_FALLBACK)
-		qid = fallback(dev, skb);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0)
-		qid = __netdev_pick_tx(dev, skb);
-#else
 		qid = skb_tx_hash(dev, skb);
-#endif /* HAVE_NDO_SELECT_QUEUE_ACCEL_FALLBACK */
 #endif /* CONFIG_ARCH_ALPINE */
 		pr_debug("sel_smp_qid=%d\n", qid);
 	}
 	return qid;
 }
-#endif /* (defined HAVE_NETDEV_SELECT_QUEUE) || (defined HAVE_NET_DEVICE_OPS) */
 
 
 static int al_eth_set_mac_addr(struct net_device *dev, void *p)
@@ -5301,9 +5287,7 @@ static const struct net_device_ops al_eth_netdev_ops = {
 	.ndo_open		= al_eth_open,
 	.ndo_stop		= al_eth_close,
 	.ndo_start_xmit		= al_eth_start_xmit,
-#ifndef CONFIG_MACH_QNAPTS
 	.ndo_select_queue	= al_eth_select_queue,
-#endif
 	.ndo_get_stats64	= al_eth_get_stats64,
 	.ndo_do_ioctl		= al_eth_ioctl,
 	.ndo_tx_timeout		= al_eth_tx_timeout,
