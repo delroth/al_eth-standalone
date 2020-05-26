@@ -1208,7 +1208,7 @@ static void al_eth_enable_msix(struct al_eth_adapter *adapter)
 
 	rc = -ENOSPC;
 	while (msix_vecs >= 1) {
-		rc = pci_enable_msix(adapter->pdev, adapter->msix_entries, msix_vecs);
+		rc = pci_enable_msix_exact(adapter->pdev, adapter->msix_entries, msix_vecs);
 		if (rc <= 0)
 			break;
 		if (rc > 0)
