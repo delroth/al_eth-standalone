@@ -41,6 +41,9 @@ enum al_eth_direction {
 	AL_ETH_RX
 };
 
+#define PCI_VENDOR_ID_ANNAPURNA_LABS	0x1c36
+#define PCI_DEVICE_ID_AL_ETH		0x0001
+
 #define AL_ETH_MAX_HW_QUEUES	4
 #if defined(CONFIG_MACH_QNAPTS) && defined(CONFIG_ARCH_ALPINE) && defined(ARM_AL)
 #define AL_ETH_NUM_QUEUES	2
