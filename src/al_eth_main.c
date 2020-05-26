@@ -1725,7 +1725,7 @@ static int al_eth_setup_int_mode(struct al_eth_adapter *adapter, int dis_msi)
 static inline void
 al_eth_vlan_rx_frag(struct al_eth_adapter *adapter, struct sk_buff *skb, u8 *va, unsigned int *len)
 {
-	struct skb_frag_struct *frag;
+	skb_frag_t *frag;
 	struct vlan_ethhdr *veh = (struct vlan_ethhdr *)va;
 
 	if (!al_eth_vlan_hwaccel_check_and_put(&adapter->netdev->features, skb, veh)) {
@@ -1734,7 +1734,7 @@ al_eth_vlan_rx_frag(struct al_eth_adapter *adapter, struct sk_buff *skb, u8 *va,
 		skb->len -= VLAN_HLEN;
 		skb->data_len -= VLAN_HLEN;
 		frag = skb_shinfo(skb)->frags;
-		frag->page_offset += VLAN_HLEN;
+		skb_frag_off_add(frag, VLAN_HLEN);
 		skb_frag_size_sub(frag, VLAN_HLEN);
 		if (len)
 			*len -= VLAN_HLEN;
