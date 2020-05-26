@@ -5550,26 +5550,7 @@ al_eth_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	al_eth_init_rings(adapter);
 	INIT_WORK(&adapter->reset_task, al_eth_reset_task);
 
-#ifdef HAVE_NET_DEVICE_OPS
 	netdev->netdev_ops = &al_eth_netdev_ops;
-#else
-	netdev->open = &al_eth_open;
-	netdev->stop = &al_eth_close;
-	netdev->hard_start_xmit = &al_eth_start_xmit;
-	netdev->get_stats = &al_eth_get_stats;
-#ifdef HAVE_SET_RX_MODE
-	netdev->set_rx_mode = &al_eth_set_rx_mode;
-#endif
-	netdev->do_ioctl = &al_eth_ioctl;
-	netdev->set_mac_address = &al_eth_set_mac_addr;
-	netdev->change_mtu = &al_eth_change_mtu;
-	netdev->tx_timeout = &al_eth_tx_timeout;
-#ifndef CONFIG_MACH_QNAPTS
-#ifdef HAVE_NETDEV_SELECT_QUEUE
-	netdev->select_queue = &al_eth_select_queue;
-#endif
-#endif
-#endif /* HAVE_NET_DEVICE_OPS */
 
 	netdev->watchdog_timeo = TX_TIMEOUT;
 	netdev->ethtool_ops = &al_eth_ethtool_ops;
