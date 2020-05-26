@@ -64,11 +64,6 @@
 #include "al_hal_unit_adapter_regs.h"
 #include "al_hal_eth_ec_regs.h"
 
-#if defined(QNAP_HAL)
-#include <qnap/hal_event.h>
-extern int send_hal_netlink(NETLINK_EVT *event);
-#endif
-
 #define DRV_MODULE_NAME	 "al_eth"
 #ifndef DRV_MODULE_VERSION
 #define DRV_MODULE_VERSION      "0.2"
@@ -4664,11 +4659,6 @@ static int al_eth_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol
 {
 	struct al_eth_adapter *adapter = netdev_priv(netdev);
 	struct phy_device *phydev;
-
-#if defined(QNAP_HAL)
-    NETLINK_EVT hal_event;
-    struct __netlink_pic_wol *pic_wol;
-#endif
 
 	if (wol->wolopts & (WAKE_ARP | WAKE_MAGICSECURE))
 		return -EOPNOTSUPP;
