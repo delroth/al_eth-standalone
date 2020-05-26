@@ -20,62 +20,6 @@
 
 #define to_ext_attr(x) container_of(x, struct dev_ext_attribute, attr)
 
-#if defined(CONFIG_MACH_QNAPTS)
-static ssize_t al_eth_store_udma_debug_print(struct device *dev,
-        struct device_attribute *attr,
-        const char *buf, size_t len)
-{
-	struct al_eth_adapter *adapter = dev_get_drvdata(dev);
-	unsigned long udma_debug_print;
-	int err;
-
-	err = kstrtoul(buf, 10, &udma_debug_print);
-	if (err < 0)
-		return err;
-
-	rtnl_lock();
-	adapter->udma_debug_print = udma_debug_print;
-	rtnl_unlock();
-
-	return len;
-}
-
-static ssize_t al_eth_show_udma_debug_print(struct device *dev,
-        struct device_attribute *attr, char *buf)
-{
-	struct al_eth_adapter *adapter = dev_get_drvdata(dev);
-
-	return sprintf(buf, "%d\n", adapter->udma_debug_print);
-}
-
-static struct device_attribute dev_attr_udma_debug_print = {
-	.attr = {.name = "udma_debug_print", .mode = (S_IRUGO | S_IWUSR)},
-	.show = al_eth_show_udma_debug_print,
-	.store = al_eth_store_udma_debug_print,
-};
-static ssize_t al_eth_store_tx_timeout_reset(struct device *dev,
-        struct device_attribute *attr,
-        const char *buf, size_t len)
-{
-	struct al_eth_adapter *adapter = dev_get_drvdata(dev);
-	unsigned long reset;
-	int err;
-
-	err = kstrtoul(buf, 10, &reset);
-	if (err < 0)
-		return err;
-    if (reset)
-        schedule_work(&adapter->reset_task);
-
-	return len;
-}
-
-static struct device_attribute dev_attr_tx_timeout_reset = {
-	.attr = {.name = "tx_timeout_reset", .mode = (S_IWUSR)},
-	.store = al_eth_store_tx_timeout_reset,
-};
-#endif
-
 static int al_eth_validate_small_copy_len(struct al_eth_adapter *adapter,
 		unsigned long len)
 {
@@ -502,13 +446,6 @@ int al_eth_sysfs_init(
 
 	int i;
 
-#if defined(CONFIG_MACH_QNAPTS)
-	if (device_create_file(dev, &dev_attr_udma_debug_print))
-		dev_info(dev, "failed to create dev_attr_udma_debug_print sysfs entry");
-	if (device_create_file(dev, &dev_attr_tx_timeout_reset))
-		dev_info(dev, "failed to create dev_attr_tx_timeout_reset sysfs entry");
-#endif
-
 	if (device_create_file(dev, &dev_attr_small_copy_len))
 		dev_info(dev, "failed to create small_copy_len sysfs entry");
 
@@ -580,10 +517,6 @@ void al_eth_sysfs_terminate(
 {
 	int i;
 
-#if defined(CONFIG_MACH_QNAPTS)
-	device_remove_file(dev, &dev_attr_udma_debug_print);
-	device_remove_file(dev, &dev_attr_tx_timeout_reset);
-#endif
 	device_remove_file(dev, &dev_attr_small_copy_len);
 	device_remove_file(dev, &dev_attr_link_poll_interval);
 	device_remove_file(dev, &dev_attr_link_management_debug);

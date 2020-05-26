@@ -2819,9 +2819,6 @@ static int al_serdes_rx_equalization(
 	}
 
 	if (!done) {
-#if defined(CONFIG_MACH_QNAPTS)
-        if (obj->debug)
-#endif
 		al_err("%s: Timeout!\n", __func__);
 		return -1;
 	}

@@ -633,14 +633,9 @@ static int al_eth_board_params_init(struct al_eth_adapter *adapter)
 		adapter->ref_clk_freq = params.ref_clk_freq;
 		adapter->dont_override_serdes = params.dont_override_serdes;
 		adapter->link_config.active_duplex = !params.half_duplex;
-#if defined(CONFIG_MACH_QNAPTS)
-        // patch code from linux-3.10.20
-        adapter->link_config.autoneg = !params.an_disable;
-#else
 		adapter->link_config.autoneg = (adapter->phy_exist) ?
 			(params.an_mode == AL_ETH_BOARD_AUTONEG_IN_BAND) :
 			(!params.an_disable);
-#endif
 		adapter->link_config.force_1000_base_x = params.force_1000_base_x;
 		adapter->retimer.exist = params.retimer_exist;
 		adapter->retimer.type = params.retimer_type;
@@ -1000,10 +995,6 @@ static int al_eth_hw_init(struct al_eth_adapter *adapter)
 
 static int al_eth_hw_stop(struct al_eth_adapter *adapter)
 {
-#ifdef CONFIG_MACH_QNAPTS
-    int ret = -1;
-    int i;
-#endif
 	al_eth_mac_stop(&adapter->hal_adapter);
 
 	if (adapter->udma_num != 0) {
@@ -1019,20 +1010,8 @@ static int al_eth_hw_stop(struct al_eth_adapter *adapter)
 	 * UDMA to write to the memory
 	 */
 	udelay(100);
-#ifdef CONFIG_MACH_QNAPTS
-
-    for (i = 0; i < 3; i++)
-    {
-        al_eth_udma_queues_reset_all(adapter);
-        ret = al_eth_adapter_stop(&adapter->hal_adapter);
-        if (ret == 0)
-            break;
-    }
-    printk("%s: reset count %d, result = %d\n", __func__, i, ret);
-#else
     al_eth_udma_queues_reset_all(adapter);
     al_eth_adapter_stop(&adapter->hal_adapter);
-#endif
 	adapter->flags |= AL_ETH_FLAG_RESET_REQUESTED;
 
 	/* disable flow ctrl to avoid pause packets*/
@@ -2010,10 +1989,6 @@ static void al_eth_mdiobus_teardown(struct al_eth_adapter *adapter)
 	mdiobus_unregister(adapter->mdio_bus);
 	mdiobus_free(adapter->mdio_bus);
 	phy_device_free(adapter->phydev);
-#if defined(CONFIG_MACH_QNAPTS)
-    adapter->mdio_bus = NULL;
-    adapter->phydev = NULL;
-#endif
 }
 
 /**
@@ -2310,45 +2285,12 @@ int al_eth_write_pci_config(void *handle, int where, uint32_t val)
 static void al_eth_reset_task(struct work_struct *work)
 {
 	struct al_eth_adapter *adapter;
-#ifdef CONFIG_MACH_QNAPTS
-    int rc = -1;
-#endif
 	adapter = container_of(work, struct al_eth_adapter, reset_task);
 	netdev_err(adapter->netdev, "%s restarting interface\n", __func__);
 	/*restart interface*/
 	rtnl_lock();
-#ifdef CONFIG_MACH_QNAPTS
-#ifdef CONFIG_PHYLIB
-	/** Stop PHY & MDIO BUS */
-    if (adapter->phy_exist != false)
-    {
-        if (adapter->phydev) {
-            phy_stop(adapter->phydev);
-            phy_disconnect(adapter->phydev);
-            al_eth_mdiobus_teardown(adapter);
-        }
-    }
-#endif
-#endif
 	al_eth_down(adapter);
 	al_eth_up(adapter);
-#ifdef CONFIG_MACH_QNAPTS
-#ifdef CONFIG_PHYLIB
-	/** Start PHY & MDIO BUS */
-    if (adapter->phy_exist != false)
-    {
-        rc = al_eth_mdiobus_setup(adapter);
-        if (rc) {
-            printk("%s: failed at mdiobus setup!\n", __func__);
-        }
-
-        if (adapter->mdio_bus) {
-            rc = al_eth_phy_init(adapter);
-            printk("%s: phy init rc = %d\n", __func__, rc);
-        }
-    }
-#endif
-#endif
 	rtnl_unlock();
 }
 
@@ -2923,10 +2865,6 @@ al_eth_free_tx_bufs(struct al_eth_adapter *adapter, unsigned int qid)
 	struct al_eth_ring *tx_ring = &adapter->tx_ring[qid];
 	unsigned int i;
 	bool udma_debug_printed = 0;
-
-#if defined(CONFIG_MACH_QNAPTS)
-	udma_debug_printed = adapter->udma_debug_print ? false: true;
-#endif
 
 	for (i = 0; i < AL_ETH_DEFAULT_TX_SW_DESCS; i++) {
 		struct al_eth_tx_buffer *tx_info = &tx_ring->tx_buffer_info[i];
@@ -4184,39 +4122,8 @@ static int al_eth_close(struct net_device *netdev)
 	return 0;
 }
 
-#if defined(CONFIG_MACH_QNAPTS)
-// Patch code from linux-3.10.20 for fixing bug#112643
-static int
-al_eth_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
-{
-    struct al_eth_adapter *adapter = netdev_priv(netdev);
-    struct phy_device *phydev = adapter->phydev;
+#if 0
 
-    if (phydev)
-        return phy_ethtool_gset(phydev, ecmd);
-
-    if (adapter->mac_mode == AL_ETH_MAC_MODE_10GbE_Serial) {
-        ecmd->speed = SPEED_10000;
-        ecmd->autoneg = AUTONEG_DISABLE;
-        ecmd->duplex = DUPLEX_FULL;
-        ecmd->advertising |= ADVERTISED_10000baseT_Full;
-        ecmd->supported |= SUPPORTED_10000baseT_Full;
-    } else {
-        ecmd->speed = adapter->link_config.active_speed;
-        ecmd->duplex = adapter->link_config.active_duplex;
-        ecmd->autoneg = adapter->link_config.autoneg;
-
-		// fix bug#120065. only deal with 10G SFP+ Port
-		if(!adapter->phy_exist)
-		{
-			ecmd->advertising |= ADVERTISED_10000baseT_Full;
-			ecmd->supported |= SUPPORTED_10000baseT_Full;
-		}
-    }
-
-    return 0;
-}
-#else
 static int
 al_eth_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 {
@@ -4375,6 +4282,8 @@ static void al_eth_get_stats64(struct net_device *netdev,
 	stats->rx_errors = mac_stats->ifInErrors;
 	stats->tx_errors = mac_stats->ifOutErrors;
 }
+
+#if 0
 
 static void
 al_eth_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
@@ -4909,6 +4818,7 @@ static const struct ethtool_ops al_eth_ethtool_ops = {
 	.set_eee		= al_eth_set_eee,
 #endif
 };
+#endif
 
 /* These numbers were obtained empirically by simulation of valid mss, header length
  * and payload length values

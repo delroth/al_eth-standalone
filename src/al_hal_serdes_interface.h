@@ -682,9 +682,6 @@ struct al_serdes_mode_set_adv_params {
 
 struct al_serdes_grp_obj {
 	void __iomem				*regs_base;
-#if defined(CONFIG_MACH_QNAPTS)
-    al_bool debug; // a copy from struct al_eth_lm_context
-#endif
 
 	/**
 	 * get the type of the serdes.

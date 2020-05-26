@@ -45,11 +45,7 @@ enum al_eth_direction {
 #define PCI_DEVICE_ID_AL_ETH		0x0001
 
 #define AL_ETH_MAX_HW_QUEUES	4
-#if defined(CONFIG_MACH_QNAPTS) && defined(CONFIG_ARCH_ALPINE) && defined(ARM_AL)
-#define AL_ETH_NUM_QUEUES	2
-#else
 #define AL_ETH_NUM_QUEUES	4
-#endif
 #define AL_ETH_MAX_MSIX_VEC	(1 + 2 * AL_ETH_MAX_HW_QUEUES)
 
 #define AL_ETH_DEFAULT_TX_SW_DESCS	(2*512)
@@ -443,9 +439,6 @@ struct al_eth_adapter {
 	al_bool				kr_fec_enable;
 
 	struct 	work_struct 		reset_task;
-#if defined(CONFIG_MACH_QNAPTS)
-	unsigned long       udma_debug_print;
-#endif
 };
 
 #endif /* !(AL_ETH_H) */

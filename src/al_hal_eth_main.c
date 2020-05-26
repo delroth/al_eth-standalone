@@ -51,12 +51,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "al_hal_eth_ex_internal.h"
 #endif
 
-#if  defined(CONFIG_MACH_QNAPTS)
-// 0xff80: 366 kHz
-// 0x2E80  2 MHz
-#define QNAP_1GbE_MDIO_FREQ   (0xff8c) //(al default is 0x5d8c)
-#endif
-
 /* EC error interrupts */
 #define AL_ETH_EC_IOFIC_GROUP_A_ERROR_INTS \
 	(AL_ETH_EC_IOFIC_GROUP_A_ERR_MSW_IN_SOP_IN_PKT | \
@@ -2449,16 +2443,6 @@ int al_eth_mdio_config(
 
 		val &= ~(0x1FF << 7);
 		val |= (ref_clk_freq_khz / (2 * mdio_clk_freq_khz)) << 7;
-
-#if defined(CONFIG_MACH_QNAPTS)
-        if(AL_ETH_IS_1G_MAC(adapter->mac_mode))
-        {
-            /* qnap modify mdio freq. setting for better signal margin by hw measurement value*/
-            val &= ~(0xFFFF);
-            val |= QNAP_1GbE_MDIO_FREQ;
-//            printk("=== QNAP MDIO Freq: eth [%s]: mdio freq. set val = 0x%x\n", adapter->name, val);
-        }
-#endif
 
 		AL_REG_FIELD_SET(val, ETH_10G_MAC_MDIO_CFG_HOLD_TIME_MASK,
 				 ETH_10G_MAC_MDIO_CFG_HOLD_TIME_SHIFT,

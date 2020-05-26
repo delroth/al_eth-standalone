@@ -657,17 +657,6 @@ static int al_eth_module_detect(struct al_eth_lm_context	*lm_context,
 	return 0;
 }
 
-#if defined(CONFIG_MACH_QNAPTS) && defined(ARM_AL2)
-static struct al_serdes_adv_tx_params da_tx_params = {
-	.override		= AL_TRUE,
-	.amp			= 0x3,
-	.total_driver_units	= 0x13,
-	.c_plus_1		= 0x4,
-	.c_plus_2		= 0,
-	.c_minus_1		= 0,
-	.slew_rate		= 0,
-};
-#else
 static struct al_serdes_adv_tx_params da_tx_params = {
 	.override		= AL_TRUE,
 	.amp			= 0x1,
@@ -677,7 +666,6 @@ static struct al_serdes_adv_tx_params da_tx_params = {
 	.c_minus_1		= 0x2,
 	.slew_rate		= 0,
 };
-#endif
 
 
 static struct al_serdes_adv_rx_params da_rx_params = {
@@ -866,11 +854,7 @@ static int al_eth_rx_equal_run(struct al_eth_lm_context	*lm_context)
 					lm_context->lane);
 
 		if (test_score < 0) {
-#if defined(CONFIG_MACH_QNAPTS)
-            lm_debug("al_warn: serdes rx equalization failed on error\n");
-#else
 			al_warn("serdes rx equalization failed on error\n");
-#endif
 			return test_score;
 		}
 
@@ -1638,11 +1622,7 @@ static int al_eth_lm_check_for_link(struct al_eth_lm_context *lm_context, al_boo
 			lm_debug("%s: Failed to establish link\n", __func__);
 		else
         {
-#if defined(CONFIG_MACH_QNAPTS)
-            lm_debug("al_err: %s: Failed to establish link\n", __func__);
-#else
 			al_err("%s: Failed to establish link\n", __func__);
-#endif
         }
 		ret = -1;
 	} else {
@@ -2486,10 +2466,6 @@ void al_eth_lm_debug_mode_set(struct al_eth_lm_context	*lm_context,
 			      al_bool			enable)
 {
 	lm_context->debug = enable;
-#if defined(CONFIG_MACH_QNAPTS)
-    if (lm_context->serdes_obj)
-        lm_context->serdes_obj->debug = enable;
-#endif
 }
 
 
