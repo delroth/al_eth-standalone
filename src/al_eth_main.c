@@ -259,11 +259,7 @@ MODULE_DEVICE_TABLE(pci, al_eth_pci_tbl);
 	AL_ETH_INTR_MODERATION_RESOLUTION_NSECS(sb_clk_freq)))
 
 /** Enable (AL_TRUE) / disable (AL_FALSE) interrupt moderation */
-#ifdef CONFIG_ARCH_ALPINE
-#define AL_ETH_DEFAULT_ADAPTIVE_INT_MODERATION	AL_FALSE
-#else
 #define AL_ETH_DEFAULT_ADAPTIVE_INT_MODERATION	AL_TRUE
-#endif
 
 static int adaptive_int_moderation = AL_ETH_DEFAULT_ADAPTIVE_INT_MODERATION;
 module_param(adaptive_int_moderation, int, 0);
