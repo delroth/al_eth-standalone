@@ -2259,7 +2259,7 @@ static int al_eth_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 #endif
 }
 
-static void al_eth_tx_timeout(struct net_device *dev)
+static void al_eth_tx_timeout(struct net_device *dev, unsigned int txqueue)
 {
 	struct al_eth_adapter *adapter = netdev_priv(dev);
 
@@ -3776,8 +3776,8 @@ static void al_eth_link_status_task_nic(struct work_struct *work)
 #ifdef CONFIG_ARCH_ALPINE
 static unsigned int al_eth_systime_msec_get(void)
 {
-	struct timespec ts;
-	getnstimeofday(&ts);
+	struct timespec64 ts;
+	ktime_get_real_ts64(&ts);
 	return (unsigned int)((ts.tv_sec * 1000) + (ts.tv_nsec / 1000000));
 }
 

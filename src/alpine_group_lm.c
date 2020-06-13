@@ -16,6 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <linux/ktime.h>
 #include <linux/time.h>
 #include <linux/timer.h>
 #include "al_serdes.h"
@@ -29,8 +30,8 @@ static struct al_eth_group_lm_context group_lm_context[AL_SRDS_NUM_GROUPS];
 
 static unsigned int alpine_systime_msec_get(void)
 {
-	struct timespec ts;
-	getnstimeofday(&ts);
+	struct timespec64 ts;
+	ktime_get_real_ts64(&ts);
 
 	return (unsigned int)((ts.tv_sec * 1000) + (ts.tv_nsec / 1000000));
 }
