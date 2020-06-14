@@ -1249,7 +1249,7 @@ static void al_eth_init_intr_default_moderation_table_intervals(struct al_eth_ad
 		AL_ETH_INTR_LOW_VALUE(sb_clk_freq);
 	default_moderation_table[AL_ETH_INTR_MODERATION_MID].intr_moderation_interval =
 		AL_ETH_INTR_MID_VALUE(sb_clk_freq);
-	default_moderation_table[AL_ETH_INTR_MODERATION_HIGHEST].intr_moderation_interval =
+	default_moderation_table[AL_ETH_INTR_MODERATION_HIGH].intr_moderation_interval =
 		AL_ETH_INTR_HIGH_VALUE(sb_clk_freq);
 	default_moderation_table[AL_ETH_INTR_MODERATION_HIGHEST].intr_moderation_interval =
 		AL_ETH_INTR_HIGHEST_VALUE(sb_clk_freq);
