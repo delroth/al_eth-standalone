@@ -5522,6 +5522,9 @@ al_eth_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		adapter->rss_ind_tbl[i] = i % AL_ETH_NUM_QUEUES;
 #endif
 
+	netdev->min_mtu = AL_ETH_MIN_MTU;
+	netdev->max_mtu = AL_ETH_MAX_MTU;
+
 	u64_stats_init(&adapter->syncp);
 
 	rc = register_netdev(netdev);
