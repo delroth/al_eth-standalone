@@ -43,6 +43,7 @@ enum al_eth_direction {
 
 #define PCI_VENDOR_ID_ANNAPURNA_LABS	0x1c36
 #define PCI_DEVICE_ID_AL_ETH		0x0001
+#define PCI_DEVICE_ID_AL_ETH_ADVANCED	0x0002
 
 #define AL_ETH_MAX_HW_QUEUES	4
 #define AL_ETH_NUM_QUEUES	4
