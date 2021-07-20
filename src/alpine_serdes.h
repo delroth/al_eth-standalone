@@ -19,6 +19,8 @@
 #ifndef __ALPINE_SERDES_H__
 #define __ALPINE_SERDES_H__
 
+int alpine_serdes_grp_objs_init(void);
+
 /* Get SerDes group regs base, to be used in relevant Alpine drivers.
  * Valid group is 0..3.
  * Returns virtual base address of the group regs base. */
