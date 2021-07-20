@@ -5,11 +5,7 @@
 #ifndef _KCOMPAT_H_
 #define _KCOMPAT_H_
 
-#ifndef LINUX_VERSION_CODE
 #include <linux/version.h>
-#else
-#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
-#endif
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/errno.h>
