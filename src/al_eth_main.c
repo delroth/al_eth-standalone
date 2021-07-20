@@ -5704,6 +5704,7 @@ static struct pci_driver al_eth_pci_driver = {
 static int __init al_eth_init(void)
 {
 	alpine_serdes_grp_objs_init();
+	alpine_group_lm_init();
 	return pci_register_driver(&al_eth_pci_driver);
 }
 

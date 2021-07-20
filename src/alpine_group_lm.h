@@ -19,6 +19,8 @@
 #ifndef __ALPINE_GROUP_LM_H__
 #define __ALPINE_GROUP_LM_H__
 
+int alpine_group_lm_init(void);
+
 /* Return a pointer to group_lm_context of the serdes group*/
 struct al_eth_group_lm_context *alpine_group_lm_get(u32 group);
 
