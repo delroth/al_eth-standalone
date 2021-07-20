@@ -2249,6 +2249,7 @@ int al_eth_lm_link_establish_step(struct al_eth_lm_context	*lm_context,
 					case AL_ETH_LM_AUTO_FEC_INIT_ENABLED:
 						lm_context->auto_fec_wait_to_toggle =
 							lm_context->auto_fec_toggle_timeout;
+						/* fallthrough */
 					case AL_ETH_LM_AUTO_FEC_ENABLED:
 						lm_context->auto_fec_state =
 							AL_ETH_LM_AUTO_FEC_DISABLED;

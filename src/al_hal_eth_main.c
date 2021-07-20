@@ -2424,6 +2424,7 @@ int al_eth_mdio_config(
 			al_err("eth [%s]: %s: invalid reference clock frequency"
 				" (%d)\n",
 				adapter->name, __func__, ref_clk_freq);
+			/* fallthrough */
 		case AL_ETH_REF_FREQ_375_MHZ:
 			ref_clk_freq_khz = 375000;
 			break;
