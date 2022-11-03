@@ -1769,7 +1769,7 @@ static	struct sk_buff *al_eth_rx_skb(struct al_eth_adapter *adapter,
 		/* Need to use the same length when using the dma_* APIs */
 		orig_len = len;
 
-		pci_dma_sync_single_for_cpu(adapter->pdev, rx_info->dma,
+		dma_sync_single_for_cpu(&adapter->pdev->dev, rx_info->dma,
 					    orig_len, DMA_FROM_DEVICE);
 		if (hal_pkt->source_vlan_count > 0)
 			/* This function alters len when the packet has a vlan tag */
@@ -1777,7 +1777,7 @@ static	struct sk_buff *al_eth_rx_skb(struct al_eth_adapter *adapter,
 
 		skb_copy_to_linear_data(skb, va, len);
 
-		pci_dma_sync_single_for_device(adapter->pdev, rx_info->dma,
+		dma_sync_single_for_device(&adapter->pdev->dev, rx_info->dma,
 				orig_len, DMA_FROM_DEVICE);
 
 		skb_put(skb, len);
@@ -5285,16 +5285,16 @@ al_eth_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return -ENOMEM;
 	}
 
-	rc = pci_set_dma_mask(pdev, DMA_BIT_MASK(40));
+	rc = dma_set_mask(&pdev->dev, DMA_BIT_MASK(40));
 	if (rc) {
-		dev_err(&pdev->dev, "pci_set_dma_mask failed 0x%x\n", rc);
+		dev_err(&pdev->dev, "dma_set_mask failed 0x%x\n", rc);
 		return rc;
 	}
 
-	rc = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(40));
+	rc = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(40));
 	if (rc) {
 		dev_err(&pdev->dev,
-			"err_pci_set_consistent_dma_mask failed 0x%x\n", rc);
+			"dma_set_coherent_mask failed 0x%x\n", rc);
 		return rc;
 	}
 
