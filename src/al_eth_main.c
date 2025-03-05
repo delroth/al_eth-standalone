@@ -219,11 +219,6 @@ MODULE_DEVICE_TABLE(pci, al_eth_pci_tbl);
 
 #define AL_ETH_SERDES_25G_OFFSET 0x2000 /** Offset into 25g serdes from serdes base */
 
-/** MDIO clause 45 helpers */
-#define AL_ETH_MDIO_C45_DEV_MASK	0x1f0000
-#define AL_ETH_MDIO_C45_DEV_SHIFT	16
-#define AL_ETH_MDIO_C45_REG_MASK	0xffff
-
 #define  AL_ETH_REF_CLK_FREQ_TO_HZ(ref_clk_freq)   \
 	( ((ref_clk_freq) == AL_ETH_REF_FREQ_375_MHZ) ? 375000000 : (   \
 	((ref_clk_freq) == AL_ETH_REF_FREQ_500_MHZ) ? 500000000 : (   \
@@ -1899,7 +1894,8 @@ al_eth_config_rx_fwd(struct al_eth_adapter *adapter)
 
 #ifdef CONFIG_PHYLIB
 /* MDIO */
-static int al_mdio_read(struct mii_bus *bp, int mii_id, int reg)
+
+static int al_mdio_read_c45(struct mii_bus *bp, int mii_id, int dev, int reg)
 {
 	struct al_eth_adapter *adapter = bp->priv;
 	u16 value = 0;
@@ -1907,20 +1903,10 @@ static int al_mdio_read(struct mii_bus *bp, int mii_id, int reg)
 	int timeout = MDIO_TIMEOUT_MSEC;
 
 	while (timeout > 0) {
-		if (reg & MII_ADDR_C45) {
-			/** Clause 45 */
-			al_dbg("%s [c45]: dev %x reg %x val %x\n",
-				__func__,
-				((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
-				(reg & AL_ETH_MDIO_C45_REG_MASK), value);
-			rc = al_eth_mdio_read(&adapter->hal_adapter, adapter->phy_addr,
-				((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
-				(reg & AL_ETH_MDIO_C45_REG_MASK), &value);
-		} else {
-			/** Clause 22 */
-			rc = al_eth_mdio_read(&adapter->hal_adapter, adapter->phy_addr,
-					      MDIO_DEVAD_NONE, reg, &value);
-		}
+		al_dbg("%s [c45]: dev %x reg %x val %x\n",
+			__func__, dev, reg, value);
+		rc = al_eth_mdio_read(&adapter->hal_adapter, adapter->phy_addr,
+			dev, reg, &value);
 
 		if (rc == 0)
 			return value;
@@ -1939,25 +1925,17 @@ static int al_mdio_read(struct mii_bus *bp, int mii_id, int reg)
 }
 
 static int
-al_mdio_write(struct mii_bus *bp, int mii_id, int reg, u16 val)
+al_mdio_write_c45(struct mii_bus *bp, int mii_id, int dev, int reg, u16 val)
 {
 	struct al_eth_adapter *adapter = bp->priv;
 	int rc;
 	int timeout = MDIO_TIMEOUT_MSEC;
 
 	while (timeout > 0) {
-		if (reg & MII_ADDR_C45) {
-			al_dbg("%s [c45]: device %x reg %x val %x\n",
-				__func__,
-				((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
-				(reg & AL_ETH_MDIO_C45_REG_MASK), val);
-			rc = al_eth_mdio_write(&adapter->hal_adapter, adapter->phy_addr,
-				((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
-				(reg & AL_ETH_MDIO_C45_REG_MASK), val);
-		} else {
-			rc = al_eth_mdio_write(&adapter->hal_adapter, adapter->phy_addr,
-				       MDIO_DEVAD_NONE, reg, val);
-		}
+		al_dbg("%s [c45]: device %x reg %x val %x\n",
+			__func__, dev, reg, val);
+		rc = al_eth_mdio_write(&adapter->hal_adapter, adapter->phy_addr,
+			dev, reg, val);
 
 		if (rc == 0)
 			return 0;
@@ -2006,21 +1984,21 @@ static int al_eth_mdiobus_setup(struct al_eth_adapter *adapter)
 	if (adapter->mdio_bus == NULL)
 		return -ENOMEM;
 
-	adapter->mdio_bus->name     = "al mdio bus";
+	adapter->mdio_bus->name      = "al mdio bus";
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 26)
 	adapter->mdio_bus->id = (adapter->pdev->bus->number << 8) | adapter->pdev->devfn;
 #else
 	snprintf(adapter->mdio_bus->id, MII_BUS_ID_SIZE, "%x",
 		 (adapter->pdev->bus->number << 8) | adapter->pdev->devfn);
 #endif
-	adapter->mdio_bus->priv     = adapter;
+	adapter->mdio_bus->priv      = adapter;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 28)
 	adapter->mdio_bus->dev = &adapter->pdev->dev;
 #else
-	adapter->mdio_bus->parent   = &adapter->pdev->dev;
+	adapter->mdio_bus->parent    = &adapter->pdev->dev;
 #endif
-	adapter->mdio_bus->read     = &al_mdio_read;
-	adapter->mdio_bus->write    = &al_mdio_write;
+	adapter->mdio_bus->read_c45  = &al_mdio_read_c45;
+	adapter->mdio_bus->write_c45 = &al_mdio_write_c45;
 
 	/* Initialise the interrupts to polling */
 	for (i = 0; i < PHY_MAX_ADDR; i++)
@@ -3862,20 +3840,20 @@ static int al_eth_aq_phy_fixup(struct phy_device *phydev)
 {
 	int temp = 0;
 
-	temp = phy_read(phydev, (MII_ADDR_C45 | (7 * 0x10000) | 0x20));
+	temp = phy_read_mmd(phydev, 7, 0x20);
 	temp &= ~(1 << 12);
 
-	phy_write(phydev, (MII_ADDR_C45 | (7 * 0x10000) | 0x20), temp);
+	phy_write_mmd(phydev, 7, 0x20, temp);
 
-	temp = phy_read(phydev, (MII_ADDR_C45 | (7 * 0x10000) | 0xc400));
+	temp = phy_read_mmd(phydev, 7, 0xc400);
 	temp |= ((1 << 15) | (1 << 11) | (1 << 10));
-	phy_write(phydev, (MII_ADDR_C45 | (7 * 0x10000) | 0xc400), temp);
+	phy_write_mmd(phydev, 7, 0xc400, temp);
 
-	temp = phy_read(phydev, (MII_ADDR_C45 | (7 * 0x10000) | 0));
+	temp = phy_read_mmd(phydev, 7, 0);
 	temp |= (1 << 9);
 	temp &= ~(1 << 15);
 
-	phy_write(phydev, (MII_ADDR_C45 | (7 * 0x10000) | 0), temp);
+	phy_write_mmd(phydev, 7, 0, temp);
 
 	return 0;
 }
