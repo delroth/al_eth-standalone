@@ -3218,7 +3218,7 @@ next:
 	if (unlikely(refill_actual < refill_required)) {
 		netdev_warn(adapter->netdev,
 			"%s: rescheduling rx queue %d\n", __func__, qid);
-		napi_reschedule(napi);
+		napi_schedule(napi);
 	} else if (budget > 0) {
 		dev_dbg(&adapter->pdev->dev, "rx_poll: q %d done next to clean %x\n",
 			qid, next_to_clean);
@@ -3258,7 +3258,7 @@ al_eth_init_napi(struct al_eth_adapter *adapter)
 			poll = al_eth_tx_poll;
 			napi->qid = i - adapter->num_rx_queues;
 		}
-		netif_napi_add(adapter->netdev, &adapter->al_napi[i].napi, poll, 64);
+		netif_napi_add(adapter->netdev, &adapter->al_napi[i].napi, poll);
 		napi->adapter = adapter;
 	}
 }
