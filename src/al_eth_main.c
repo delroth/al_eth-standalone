@@ -5112,7 +5112,7 @@ static int al_eth_set_mac_addr(struct net_device *dev, void *p)
 	if (!is_valid_ether_addr(addr->sa_data))
 		return -EADDRNOTAVAIL;
 
-	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
+	eth_hw_addr_set(dev, addr->sa_data);
 	memcpy(adapter->mac_addr, addr->sa_data, dev->addr_len);
 	al_eth_mac_table_unicast_add(adapter, AL_ETH_MAC_TABLE_UNICAST_IDX_BASE,
 				     adapter->mac_addr, 1 << adapter->udma_num);
@@ -5470,7 +5470,7 @@ al_eth_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		eth_hw_addr_random(netdev);
 		memcpy(adapter->mac_addr, netdev->dev_addr, ETH_ALEN);
 	} else {
-		memcpy(netdev->dev_addr, adapter->mac_addr, ETH_ALEN);
+		eth_hw_addr_set(netdev, adapter->mac_addr);
 	}
 
 	memcpy(adapter->netdev->perm_addr, adapter->mac_addr, netdev->addr_len);
